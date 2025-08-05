@@ -45,8 +45,9 @@
                     monthlyPrice: 130,
                     annualPrice: 130 * 10,
                     credits: 2000,
-                    topUpRate: 0.065,
-                    optimalSubscribers: 278
+                    topUpRate: 0.070,
+                    optimalSubscribers: 278,
+                    topUpsForUpgrading: 3
                 },
                 {
                     name: 'Essentials',
@@ -54,7 +55,8 @@
                     annualPrice: 190 * 10,
                     credits: 3200,
                     topUpRate: 0.060,
-                    optimalSubscribers: 445
+                    optimalSubscribers: 445,
+                    topUpsForUpgrading: 2
                 },
                 {
                     name: 'Growth',
@@ -62,15 +64,17 @@
                     annualPrice: 260 * 10,
                     credits: 4800,
                     topUpRate: 0.055,
-                    optimalSubscribers: 667
+                    optimalSubscribers: 667,
+                    topUpsForUpgrading: 3
                 },
                 {
                     name: 'Plus',
                     monthlyPrice: 350,
                     annualPrice: 350 * 10,
                     credits: 7000,
-                    topUpRate: 0.050,
-                    optimalSubscribers: 973
+                    topUpRate: 0.055,
+                    optimalSubscribers: 973,
+                    topUpsForUpgrading: 2
                 },
                 {
                     name: 'Pro',
@@ -78,7 +82,8 @@
                     annualPrice: 475 * 10,
                     credits: 10500,
                     topUpRate: 0.050,
-                    optimalSubscribers: 1460
+                    optimalSubscribers: 1460,
+                    topUpsForUpgrading: 3
                 },
                 {
                     name: 'Elite',
@@ -86,15 +91,17 @@
                     annualPrice: 675 * 10,
                     credits: 16000,
                     topUpRate: 0.045,
-                    optimalSubscribers: 2224
+                    optimalSubscribers: 2224,
+                    topUpsForUpgrading: 2
                 },
                 {
                     name: 'Max',
                     monthlyPrice: 850,
                     annualPrice: 850 * 10,
                     credits: 21250,
-                    topUpRate: 0.040,
-                    optimalSubscribers: 2954
+                    topUpRate: 0.045,
+                    optimalSubscribers: 2954,
+                    topUpsForUpgrading: 1
                 },
                 {
                     name: 'Enterprise',
@@ -102,7 +109,8 @@
                     annualPrice: 1000 * 10,
                     credits: 26667,
                     topUpRate: 0.040,
-                    optimalSubscribers: 3707
+                    optimalSubscribers: 3707,
+                    topUpsForUpgrading: 0
                 }
             ];
 
@@ -145,10 +153,20 @@
             const calculateUpgradeTimeline = () => {
                 if (growth === 0) return null;
                 
+                // First check what plan they SHOULD be on right now
+                const currentOptimalPlan = getRecommendedPlan(currentCreditsNeeded);
+                
+                // If they already need an upgrade, start from that plan
+                const startingPlan = (currentOptimalPlan.name !== currentPlan && 
+                                     pricingTiers.findIndex(t => t.name === currentOptimalPlan.name) > 
+                                     pricingTiers.findIndex(t => t.name === currentPlan)) 
+                                     ? currentOptimalPlan 
+                                     : currentPlanData;
+                
                 let monthsUntilUpgrade = 0;
                 let projectedSubscribers = subscribers;
                 
-                // Find the next optimal plan based on usage, not just sequential
+                // Find when they'll need the NEXT upgrade after their optimal plan
                 while (monthsUntilUpgrade < 24) { // Max 2 year projection
                     projectedSubscribers += growth;
                     monthsUntilUpgrade++;
@@ -161,16 +179,16 @@
                     // Find the optimal plan for this credit usage
                     const optimalPlan = getRecommendedPlan(projectedCredits);
                     
-                    // If the optimal plan is different from current and better than what we have now
-                    if (optimalPlan.name !== currentPlan && 
+                    // If the optimal plan is different from the starting plan
+                    if (optimalPlan.name !== startingPlan.name && 
                         pricingTiers.findIndex(t => t.name === optimalPlan.name) > 
-                        pricingTiers.findIndex(t => t.name === currentPlan)) {
+                        pricingTiers.findIndex(t => t.name === startingPlan.name)) {
                         
-                        // Calculate if upgrading would save money at that point
-                        const futureCreditsOver = Math.max(0, projectedCredits - currentPlanData.credits);
+                        // Calculate savings at that point
+                        const futureCreditsOver = Math.max(0, projectedCredits - startingPlan.credits);
                         const futureTopUpCount = Math.ceil(futureCreditsOver / 500);
-                        const futureTopUpCost = futureTopUpCount * 500 * currentPlanData.topUpRate;
-                        const futureCurrentCost = currentPlanData.annualPrice / 12 + futureTopUpCost;
+                        const futureTopUpCost = futureTopUpCount * 500 * startingPlan.topUpRate;
+                        const futureCurrentCost = startingPlan.annualPrice / 12 + futureTopUpCost;
                         const futureUpgradeCost = optimalPlan.annualPrice / 12;
                         const futureSavings = futureCurrentCost - futureUpgradeCost;
                         
@@ -180,7 +198,8 @@
                             nextPlan: optimalPlan,
                             creditsNeeded: projectedCredits,
                             monthlySavings: futureSavings,
-                            annualSavings: futureSavings * 12
+                            annualSavings: futureSavings * 12,
+                            afterCurrentUpgrade: startingPlan.name !== currentPlan
                         };
                     }
                 }
