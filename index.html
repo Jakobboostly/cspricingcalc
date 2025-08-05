@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boostly Customer Success Calculator</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const Check = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+        );
+
+        const TrendingUp = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+        );
+
+        const DollarSign = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        );
+
+        const CustomerSuccessCalculator = () => {
+            const [currentSubscribers, setCurrentSubscribers] = React.useState('500');
+            const [monthlyGrowth, setMonthlyGrowth] = React.useState('0');
+            const [messagesPerMonth, setMessagesPerMonth] = React.useState('4');
+            const [premiumPercentage, setPremiumPercentage] = React.useState('25');
+            const [currentPlan, setCurrentPlan] = React.useState('Essentials');
+            const [showAnalysis, setShowAnalysis] = React.useState(false);
+
+            const pricingTiers = [
+                {
+                    name: 'Starter',
+                    monthlyPrice: 130,
+                    annualPrice: 130 * 10,
+                    credits: 2000,
+                    topUpRate: 0.065,
+                    optimalSubscribers: 278
+                },
+                {
+                    name: 'Essentials',
+                    monthlyPrice: 190,
+                    annualPrice: 190 * 10,
+                    credits: 3200,
+                    topUpRate: 0.060,
+                    optimalSubscribers: 445
+                },
+                {
+                    name: 'Growth',
+                    monthlyPrice: 260,
+                    annualPrice: 260 * 10,
+                    credits: 4800,
+                    topUpRate: 0.055,
+                    optimalSubscribers: 667
+                },
+                {
+                    name: 'Plus',
+                    monthlyPrice: 350,
+                    annualPrice: 350 * 10,
+                    credits: 7000,
+                    topUpRate: 0.050,
+                    optimalSubscribers: 973
+                },
+                {
+                    name: 'Pro',
+                    monthlyPrice: 475,
+                    annualPrice: 475 * 10,
+                    credits: 10500,
+                    topUpRate: 0.050,
+                    optimalSubscribers: 1460
+                },
+                {
+                    name: 'Elite',
+                    monthlyPrice: 675,
+                    annualPrice: 675 * 10,
+                    credits: 16000,
+                    topUpRate: 0.045,
+                    optimalSubscribers: 2224
+                },
+                {
+                    name: 'Max',
+                    monthlyPrice: 850,
+                    annualPrice: 850 * 10,
+                    credits: 21250,
+                    topUpRate: 0.040,
+                    optimalSubscribers: 2954
+                },
+                {
+                    name: 'Enterprise',
+                    monthlyPrice: 1000,
+                    annualPrice: 1000 * 10,
+                    credits: 26667,
+                    topUpRate: 0.040,
+                    optimalSubscribers: 3707
+                }
+            ];
+
+            // Calculate current usage
+            const subscribers = Number(currentSubscribers);
+            const growth = Number(monthlyGrowth);
+            const messages = Number(messagesPerMonth);
+            const premiumPct = Number(premiumPercentage) / 100;
+            const basicPct = 1 - premiumPct;
+
+            const totalMessages = subscribers * messages;
+            const basicMessages = totalMessages * basicPct;
+            const premiumMessages = totalMessages * premiumPct;
+            const currentCreditsNeeded = basicMessages + (premiumMessages * 3);
+
+            // Get current plan data
+            const currentPlanData = pricingTiers.find(t => t.name === currentPlan);
+            
+            // Calculate credits over/under and top-up costs
+            const creditsOver = Math.max(0, currentCreditsNeeded - currentPlanData.credits);
+            const topUpCount = Math.ceil(creditsOver / 500);
+            const topUpCost = topUpCount * 500 * currentPlanData.topUpRate;
+
+            // Find recommended plan based on current usage
+            const getRecommendedPlan = (creditsNeeded) => {
+                for (let tier of pricingTiers) {
+                    if (creditsNeeded <= tier.credits) {
+                        return tier;
+                    }
+                }
+                return pricingTiers[pricingTiers.length - 1];
+            };
+
+            const recommendedPlan = getRecommendedPlan(currentCreditsNeeded);
+            const shouldUpgrade = recommendedPlan.name !== currentPlan && 
+                                 pricingTiers.findIndex(t => t.name === recommendedPlan.name) > 
+                                 pricingTiers.findIndex(t => t.name === currentPlan);
+
+            // Calculate when they'll need to upgrade based on growth
+            const calculateUpgradeTimeline = () => {
+                if (growth === 0) return null;
+                
+                let monthsUntilUpgrade = 0;
+                let projectedSubscribers = subscribers;
+                const nextPlanIndex = pricingTiers.findIndex(t => t.name === currentPlan) + 1;
+                
+                if (nextPlanIndex >= pricingTiers.length) return null;
+                
+                const nextPlan = pricingTiers[nextPlanIndex];
+                
+                while (monthsUntilUpgrade < 24) { // Max 2 year projection
+                    projectedSubscribers += growth;
+                    monthsUntilUpgrade++;
+                    
+                    const projectedMessages = projectedSubscribers * messages;
+                    const projectedBasic = projectedMessages * basicPct;
+                    const projectedPremium = projectedMessages * premiumPct;
+                    const projectedCredits = projectedBasic + (projectedPremium * 3);
+                    
+                    if (projectedCredits > currentPlanData.credits) {
+                        return {
+                            months: monthsUntilUpgrade,
+                            subscribers: projectedSubscribers,
+                            nextPlan: nextPlan,
+                            creditsNeeded: projectedCredits
+                        };
+                    }
+                }
+                
+                return null;
+            };
+
+            const upgradeTimeline = calculateUpgradeTimeline();
+
+            // Calculate savings from upgrading
+            const calculateSavings = () => {
+                if (!shouldUpgrade) return null;
+                
+                const currentMonthlyCost = currentPlanData.annualPrice / 12 + topUpCost;
+                const upgradeMonthlyCost = recommendedPlan.annualPrice / 12;
+                const monthlySavings = currentMonthlyCost - upgradeMonthlyCost;
+                
+                return {
+                    currentTotal: currentMonthlyCost,
+                    upgradeTotal: upgradeMonthlyCost,
+                    monthly: monthlySavings,
+                    annual: monthlySavings * 12
+                };
+            };
+
+            const savings = calculateSavings();
+
+            // Calculate upgrade cost (difference in annual plans)
+            const calculateUpgradeCost = () => {
+                if (!shouldUpgrade) return 0;
+                
+                const monthsRemaining = 12 - (new Date().getMonth() + 1);
+                const currentRemaining = (currentPlanData.annualPrice / 12) * monthsRemaining;
+                const upgradeRemaining = (recommendedPlan.annualPrice / 12) * monthsRemaining;
+                
+                return upgradeRemaining - currentRemaining;
+            };
+
+            const upgradeCost = calculateUpgradeCost();
+
+            React.useEffect(() => {
+                setTimeout(() => setShowAnalysis(true), 300);
+            }, []);
+
+            return (
+                <div className="max-w-7xl mx-auto p-6 bg-white">
+                    {/* Header */}
+                    <div className="mb-8">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <h1 className="text-3xl font-bold text-gray-800">Boostly</h1>
+                                <span className="ml-3 text-lg text-gray-600">Customer Success Calculator</span>
+                            </div>
+                            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                                For Existing Customers
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Title */}
+                    <div className="text-center mb-8">
+                        <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                            Optimize Your SMS Plan & Maximize Savings
+                        </h1>
+                        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                            Analyze your current usage, forecast growth, and discover opportunities to save
+                        </p>
+                    </div>
+
+                    {/* Input Section */}
+                    <div className="grid md:grid-cols-2 gap-6 mb-8">
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6">
+                            <h3 className="font-semibold text-lg mb-4">Current Account Details</h3>
+                            
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Current Plan
+                                    </label>
+                                    <select
+                                        value={currentPlan}
+                                        onChange={(e) => setCurrentPlan(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    >
+                                        {pricingTiers.map(tier => (
+                                            <option key={tier.name} value={tier.name}>{tier.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Current Subscribers
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={currentSubscribers}
+                                        onChange={(e) => setCurrentSubscribers(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Monthly Subscriber Growth
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={monthlyGrowth}
+                                        onChange={(e) => setMonthlyGrowth(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                        placeholder="50"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6">
+                            <h3 className="font-semibold text-lg mb-4">Messaging Configuration</h3>
+                            
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Messages per Subscriber per Month
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={messagesPerMonth}
+                                        onChange={(e) => setMessagesPerMonth(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Premium Message Percentage
+                                    </label>
+                                    <div className="flex items-center space-x-2">
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="100"
+                                            value={premiumPercentage}
+                                            onChange={(e) => setPremiumPercentage(e.target.value)}
+                                            className="flex-1"
+                                        />
+                                        <span className="w-12 text-center font-medium">{premiumPercentage}%</span>
+                                    </div>
+                                    <div className="text-xs text-gray-600 mt-1">
+                                        Basic: {100 - premiumPercentage}% | Premium: {premiumPercentage}%
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-lg p-3 border border-purple-200">
+                                    <div className="text-sm space-y-1">
+                                        <div className="flex justify-between">
+                                            <span>Total Messages:</span>
+                                            <span className="font-medium">{totalMessages.toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Credits Needed:</span>
+                                            <span className="font-medium text-purple-600">
+                                                {Math.round(currentCreditsNeeded).toLocaleString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Analysis Section */}
+                    <div className={`transition-opacity duration-1000 ${showAnalysis ? 'opacity-100' : 'opacity-0'}`}>
+                        
+                        {/* USE CASE 1: Immediate Savings - Make it POP! */}
+                        {savings && savings.monthly > 0 && (
+                            <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-2xl p-8 mb-8 shadow-2xl transform hover:scale-[1.02] transition-transform">
+                                <div className="text-center">
+                                    <h2 className="text-2xl font-bold mb-4 opacity-90">
+                                        Upgrade to {recommendedPlan.name} Plan Today
+                                    </h2>
+                                    <div className="text-7xl font-bold mb-2 drop-shadow-lg">
+                                        SAVE ${Math.round(savings.annual).toLocaleString()}
+                                    </div>
+                                    <div className="text-3xl font-semibold opacity-95 mb-6">
+                                        PER YEAR
+                                    </div>
+                                    <div className="bg-white/20 rounded-lg p-4 inline-block">
+                                        <p className="text-xl font-medium">
+                                            That's ${Math.round(savings.monthly)} every single month!
+                                        </p>
+                                    </div>
+                                    <div className="mt-4 text-lg opacity-90">
+                                        🎯 This is a no-brainer - you're already at this usage level
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="grid lg:grid-cols-3 gap-6 mb-8">
+                            {/* Current Plan Analysis */}
+                            <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
+                                <h3 className="font-semibold text-lg mb-4 text-gray-800">Current Plan Analysis</h3>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between text-sm">
+                                        <span>Plan:</span>
+                                        <span className="font-medium">{currentPlan}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span>Monthly Credits:</span>
+                                        <span className="font-medium">{currentPlanData.credits.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span>Credits Used:</span>
+                                        <span className={`font-medium ${creditsOver > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                            {Math.round(currentCreditsNeeded).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    {creditsOver > 0 && (
+                                        <>
+                                            <div className="border-t pt-2">
+                                                <div className="flex justify-between text-sm">
+                                                    <span>Credits Over:</span>
+                                                    <span className="font-medium text-red-600">
+                                                        {Math.round(creditsOver).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between text-sm">
+                                                    <span>Top-ups Needed:</span>
+                                                    <span className="font-medium">{topUpCount}</span>
+                                                </div>
+                                                <div className="flex justify-between text-sm font-bold text-red-600">
+                                                    <span>Extra Cost:</span>
+                                                    <span>${topUpCost.toFixed(2)}/mo</span>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                    <div className="border-t pt-2">
+                                        <div className="flex justify-between font-bold">
+                                            <span>Total Monthly:</span>
+                                            <span className="text-blue-600">
+                                                ${(currentPlanData.annualPrice / 12 + topUpCost).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Recommended Plan */}
+                            {shouldUpgrade && (
+                                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-400 rounded-xl p-6">
+                                    <h3 className="font-semibold text-lg mb-4 text-green-800">
+                                        Recommended Upgrade
+                                    </h3>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between text-sm">
+                                            <span>Upgrade to:</span>
+                                            <span className="font-bold text-green-600">{recommendedPlan.name}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span>Monthly Credits:</span>
+                                            <span className="font-medium">{recommendedPlan.credits.toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span>Credit Buffer:</span>
+                                            <span className="font-medium text-green-600">
+                                                +{(recommendedPlan.credits - currentCreditsNeeded).toLocaleString()}
+                                            </span>
+                                        </div>
+                                        <div className="border-t pt-2">
+                                            <div className="flex justify-between text-sm">
+                                                <span>New Monthly:</span>
+                                                <span className="font-medium">
+                                                    ${(recommendedPlan.annualPrice / 12).toFixed(2)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between text-sm font-bold text-green-600">
+                                                <span>You Save:</span>
+                                                <span>${savings ? savings.monthly.toFixed(2) : '0'}/mo</span>
+                                            </div>
+                                        </div>
+                                        <div className="bg-green-100 rounded-lg p-3 mt-3">
+                                            <p className="text-xs text-green-800">
+                                                <strong>To Upgrade:</strong> Pay ${upgradeCost.toFixed(2)} difference for remaining year
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Growth Forecast */}
+                            {upgradeTimeline && (
+                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-6">
+                                    <h3 className="font-semibold text-lg mb-4 text-blue-800 flex items-center">
+                                        <TrendingUp className="h-5 w-5 mr-2" />
+                                        Growth Forecast
+                                    </h3>
+                                    <div className="space-y-3">
+                                        <div className="bg-blue-100 rounded-lg p-3">
+                                            <p className="text-sm font-medium text-blue-900">
+                                                Based on {growth} new subscribers/month
+                                            </p>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span>Next upgrade in:</span>
+                                            <span className="font-bold text-blue-600">
+                                                {upgradeTimeline.months} months
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span>Subscribers then:</span>
+                                            <span className="font-medium">
+                                                {upgradeTimeline.subscribers.toLocaleString()}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span>Next plan:</span>
+                                            <span className="font-medium">{upgradeTimeline.nextPlan.name}</span>
+                                        </div>
+                                        <div className="border-t pt-2">
+                                            <p className="text-xs text-gray-600">
+                                                Plan ahead to maximize savings and avoid top-up fees
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Detailed Breakdown */}
+                        <div className="grid md:grid-cols-2 gap-6">
+                            {/* 12-Month Projection */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-6">
+                                <h3 className="font-semibold text-lg mb-4">12-Month Projection</h3>
+                                <div className="space-y-3">
+                                    {[3, 6, 9, 12].map(months => {
+                                        const projSubs = subscribers + (growth * months);
+                                        const projMessages = projSubs * messages;
+                                        const projCredits = (projMessages * basicPct) + (projMessages * premiumPct * 3);
+                                        
+                                        return (
+                                            <div key={months} className="flex justify-between text-sm border-b pb-2">
+                                                <span>Month {months}:</span>
+                                                <div className="text-right">
+                                                    <div className="font-medium">{projSubs.toLocaleString()} subs</div>
+                                                    <div className="text-xs text-gray-600">
+                                                        {Math.round(projCredits).toLocaleString()} credits
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* ROI Impact */}
+                            <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6">
+                                <h3 className="font-semibold text-lg mb-4">ROI Impact</h3>
+                                <div className="space-y-3">
+                                    <div className="text-sm">
+                                        <p className="font-medium mb-2">Current Efficiency:</p>
+                                        <div className="bg-white rounded-lg p-3">
+                                            {creditsOver > 0 ? (
+                                                <p className="text-red-600">
+                                                    ⚠️ Overpaying by ${topUpCost.toFixed(2)}/month in top-ups
+                                                </p>
+                                            ) : (
+                                                <p className="text-green-600">
+                                                    ✓ Operating within plan limits
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    {savings && savings.annual > 0 && (
+                                        <div className="bg-gradient-to-r from-green-100 to-emerald-100 rounded-lg p-4 border border-green-300">
+                                            <p className="text-sm font-bold text-green-800 mb-1">
+                                                Annual Savings Opportunity:
+                                            </p>
+                                            <p className="text-2xl font-bold text-green-600">
+                                                ${Math.round(savings.annual).toLocaleString()}
+                                            </p>
+                                            <p className="text-xs text-green-700 mt-1">
+                                                That's {Math.round((savings.annual / (currentPlanData.annualPrice + topUpCost * 12)) * 100)}% 
+                                                of your current annual spend!
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Action Items */}
+                    <div className="mt-8 bg-gray-50 rounded-xl p-6">
+                        <h3 className="font-semibold text-lg mb-4">Recommended Actions</h3>
+                        <div className="grid md:grid-cols-2 gap-4">
+                            {shouldUpgrade && (
+                                <div className="bg-green-100 border border-green-300 rounded-lg p-4">
+                                    <h4 className="font-medium text-green-800 mb-2">Immediate Action</h4>
+                                    <p className="text-sm text-green-700">
+                                        Upgrade to {recommendedPlan.name} plan today to save ${savings ? Math.round(savings.monthly) : 0}/month
+                                    </p>
+                                </div>
+                            )}
+                            {upgradeTimeline && (
+                                <div className="bg-blue-100 border border-blue-300 rounded-lg p-4">
+                                    <h4 className="font-medium text-blue-800 mb-2">Plan Ahead</h4>
+                                    <p className="text-sm text-blue-700">
+                                        Schedule upgrade review in {upgradeTimeline.months - 1} months to avoid top-up fees
+                                    </p>
+                                </div>
+                            )}
+                            {!shouldUpgrade && !creditsOver && (
+                                <div className="bg-purple-100 border border-purple-300 rounded-lg p-4">
+                                    <h4 className="font-medium text-purple-800 mb-2">Optimization Tip</h4>
+                                    <p className="text-sm text-purple-700">
+                                        You're well-optimized! Monitor growth to catch upgrade opportunities
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="mt-8 text-center text-sm text-gray-600">
+                        <p>Questions? Contact your Customer Success Manager for personalized recommendations</p>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<CustomerSuccessCalculator />, document.getElementById('root'));
+    </script>
+</body>
+</html>
